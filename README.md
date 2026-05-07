@@ -38,7 +38,12 @@ Color-coded and numbered tracking allows you to manage dozens of samples in diff
 
 ## 🚀 Quick Start
 
-1. Download `index.html`.
+### 🌐 Live Version (Recommended)
+Access the application instantly without downloading anything:  
+**[Launch Lab Timer Pro](https://mrodrigueze.github.io/lab-timer/)**
+
+### 💻 Local Use
+1. Download the `index.html` file from this repository.
 2. Open it directly in any modern web browser (Chrome, Firefox, Safari, Edge).
 3. Define your experimental categories using the **⚙ settings** panel.
 
@@ -60,7 +65,7 @@ Color-coded and numbered tracking allows you to manage dozens of samples in diff
 
 ## 👤 Author
 
-**Manuel Isaías Rodriguez Espejo** Biotechnologist & Software Developer  
+**Manuel Isaias Rodriguez Espejo** Biotechnologist & Software Developer  
 [GitHub](https://github.com/mrodrigueze) · [LinkedIn](https://www.linkedin.com/in/mrodrigueze)
 
 ---
