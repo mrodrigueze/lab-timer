@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lab Timer</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: #1e293b;
+            --panel-hover: #334155;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: #334155;
+            --radius-lg: 16px;
+            --radius-md: 10px;
+            --radius-sm: 6px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            background-color: var(--bg-color); color: var(--text-main);
+            padding: 12px 8px; display: flex; flex-direction: column; align-items: center; min-height: 100vh;
+        }
+
+        .container { width: 100%; max-width: 600px; }
+
+        button, .color-picker-input { 
+            transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1), filter 0.1s ease; 
+        }
+        button:active, .color-picker-input:active { 
+            transform: scale(0.92); 
+            filter: brightness(0.85); 
+        }
+
+        /* --- Cronómetro --- */
+        .stopwatch-bar {
+            position: sticky; top: 0; z-index: 100; background: rgba(30, 41, 59, 0.9);
+            backdrop-filter: blur(12px); padding: 12px 16px; border-radius: var(--radius-lg);
+            border: 1px solid rgba(255, 255, 255, 0.05); display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
+        }
+        .sw-time { font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .sw-btn { background: var(--panel-hover); color: white; border: none; width: 38px; height: 38px; border-radius: 50%; cursor: pointer; }
+        .sw-btn-play { background: #10b981; color: #000; }
+
+        /* --- Panel Controles --- */
+        .top-panel { background: var(--panel-bg); padding: 12px; border-radius: var(--radius-lg); border: 1px solid var(--border-color); margin-bottom: 16px; }
+        .category-header { display: flex; gap: 8px; margin-bottom: 12px; }
+        .category-select { flex: 1; background: var(--bg-color); color: white; border: 1px solid var(--border-color); padding: 12px; border-radius: var(--radius-md); font-weight: 600; outline: none; }
+        .btn-settings { background: var(--panel-hover); border: none; color: white; width: 45px; border-radius: var(--radius-md); cursor: pointer; font-size: 1.2rem; }
+
+        .quick-buttons-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+        .btn-quick {
+            background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color);
+            padding: 10px 4px; border-radius: var(--radius-md); font-size: 1.1rem; font-weight: 700;
+            cursor: pointer; display: flex; flex-direction: column; align-items: center; position: relative;
+        }
+        .btn-quick span { font-size: 0.6rem; color: var(--text-muted); margin-top: 4px; }
+        
+        .btn-delete-quick {
+            position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.5); color: #fff;
+            border: 1px solid rgba(255,255,255,0.2); font-size: 0.55rem; width: 16px; height: 16px; 
+            border-radius: 4px; display: flex; align-items: center; justify-content: center; z-index: 10;
+        }
+
+        /* --- Cabecera Temporizadores --- */
+        .timers-header {
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 0 4px;
+        }
+        .timers-count-badge {
+            background: #10b981; color: #000; padding: 2px 8px; border-radius: 12px; font-weight: 700; font-size: 0.75rem; margin-left: 6px;
+        }
+        .btn-clear-small {
+            background: transparent; border: 1px solid var(--border-color); color: var(--text-muted);
+            padding: 4px 8px; border-radius: var(--radius-sm); font-size: 0.7rem; cursor: pointer;
+        }
+        .btn-clear-small:hover { color: #ef4444; border-color: #ef4444; }
+
+        /* --- Temporizadores --- */
+        #timers-container { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+        .timer-card {
+            background: var(--panel-bg); border-radius: var(--radius-sm); padding: 8px 2px;
+            display: flex; flex-direction: column; align-items: center; border-top: 3px solid; position: relative;
+            transition: filter 0.3s, opacity 0.3s;
+        }
+        
+        .timer-expired {
+            opacity: 0.6;
+            filter: saturate(20%) brightness(80%);
+            background: var(--bg-color);
+        }
+
+        .timer-id-badge { position: absolute; top: 1px; left: 3px; font-size: 0.55rem; color: var(--text-muted); }
+        .timer-delete { position: absolute; top: 0; right: 0; background: transparent; border: none; color: var(--text-muted); padding: 4px; cursor: pointer; }
+        .timer-time { font-size: 1rem; font-weight: 700; margin-top: 6px; }
+        .timer-cat-label { font-size: 0.5rem; color: var(--text-muted); margin-top: 2px; text-align: center; max-width: 90%; overflow: hidden; }
+
+        /* --- Toast notificación --- */
+        .toast {
+            position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+            background: #10b981; color: #000; padding: 8px 20px; border-radius: 20px;
+            font-size: 0.85rem; font-weight: bold; opacity: 0;
+            transition: opacity 0.3s; z-index: 9999; pointer-events: none;
+        }
+        .toast.show { opacity: 1; }
+
+        /* --- Modales --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.9); z-index: 1000; display: none; justify-content: center; align-items: center;
+        }
+        .modal-box { background: var(--panel-bg); padding: 20px; border-radius: var(--radius-lg); width: 90%; max-width: 320px; border: 1px solid var(--border-color); }
+
+        .picker-container { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 20px 0; }
+        .picker-col { display: flex; flex-direction: column; align-items: center; width: 60px; }
+        .picker-window { height: 44px; width: 100%; overflow-y: scroll; scroll-snap-type: y mandatory; scrollbar-width: none; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); }
+        .picker-window::-webkit-scrollbar { display: none; }
+        .picker-item { height: 44px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: bold; scroll-snap-align: center; }
+        .picker-arrow { background: none; border: none; color: var(--text-muted); font-size: 1.2rem; cursor: pointer; padding: 5px; }
+
+        .cat-item-row { display: flex; gap: 6px; margin-bottom: 10px; align-items: center; }
+        .cat-input { flex: 1; background: var(--bg-color); border: 1px solid var(--border-color); color: white; padding: 8px; border-radius: 5px; font-size: 0.9rem; }
+        
+        .color-picker-input {
+            width: 32px; height: 32px; border: none; padding: 0; background: transparent; cursor: pointer;
+        }
+        .color-picker-input::-webkit-color-swatch-wrapper { padding: 0; }
+        .color-picker-input::-webkit-color-swatch { border: 2px solid var(--border-color); border-radius: 50%; }
+        .color-picker-input::-moz-color-swatch { border: 2px solid var(--border-color); border-radius: 50%; }
+
+        /* --- Botón reset config --- */
+        .btn-reset-config {
+            width: 100%; padding: 8px; background: none;
+            border: 1px dashed #ef4444; color: #ef4444;
+            border-radius: 6px; margin-bottom: 10px; cursor: pointer; font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="stopwatch-bar">
+            <div class="sw-time" id="sw-time">00:00:00.0</div>
+            <div class="sw-actions">
+                <button class="sw-btn sw-btn-play" id="sw-play" onclick="toggleStopwatch()">▶</button>
+                <button class="sw-btn" onclick="resetStopwatch()">↺</button>
+            </div>
+        </div>
+
+        <div class="top-panel">
+            <div class="category-header">
+                <select id="categorySelect" class="category-select" onchange="renderQuickButtons()"></select>
+                <button class="btn-settings" onclick="openModal('catModal')">⚙</button>
+            </div>
+            <div class="quick-buttons-grid" id="quickButtonsContainer"></div>
+        </div>
+
+        <div class="timers-header">
+            <div style="font-size: 0.8rem; font-weight: bold; color: var(--text-muted); text-transform: uppercase;">
+                Activos <span class="timers-count-badge" id="activeCountBadge">0</span>
+            </div>
+            <button class="btn-clear-small" onclick="clearAll()">✕ Limpiar</button>
+        </div>
+
+        <div id="timers-container"></div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast">✓ Configuración guardada</div>
+
+    <!-- Modal: nuevo botón -->
+    <div class="modal-overlay" id="addBtnModal">
+        <div class="modal-box">
+            <h3 style="text-align:center">Nuevo Botón</h3>
+            <div class="picker-container">
+                <div class="picker-col">
+                    <button class="picker-arrow" onclick="stepPicker('minWheel', -1)">▲</button>
+                    <div class="picker-window" id="minWheel"></div>
+                    <button class="picker-arrow" onclick="stepPicker('minWheel', 1)">▼</button>
+                    <small>Min</small>
+                </div>
+                <div style="font-size: 1.5rem; padding-bottom: 25px;">:</div>
+                <div class="picker-col">
+                    <button class="picker-arrow" onclick="stepPicker('secWheel', -1)">▲</button>
+                    <div class="picker-window" id="secWheel"></div>
+                    <button class="picker-arrow" onclick="stepPicker('secWheel', 1)">▼</button>
+                    <small>Seg</small>
+                </div>
+            </div>
+            <div style="display:flex; gap:10px;">
+                <button onclick="closeModal('addBtnModal')" style="flex:1; padding:12px; background:var(--bg-color); color:white; border:none; border-radius:8px;">Cancelar</button>
+                <button onclick="saveNewButton()" style="flex:1; padding:12px; background:#10b981; color:black; border:none; border-radius:8px; font-weight:bold;">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: categorías -->
+    <div class="modal-overlay" id="catModal">
+        <div class="modal-box" style="max-width: 350px;">
+            <h3 style="margin-bottom:15px">Editar Categorías</h3>
+            <div id="catListConfig"></div>
+            <button onclick="addNewCategory()" style="width:100%; padding:8px; background:none; border:1px dashed var(--text-muted); color:var(--text-muted); margin-bottom:10px;">+ Añadir categoría</button>
+            <button class="btn-reset-config" onclick="resetConfig()">↺ Restablecer configuración por defecto</button>
+            <button onclick="closeModal('catModal')" style="width:100%; padding:12px; background:#10b981; border:none; border-radius:8px; font-weight:bold; color:#000;">Cerrar</button>
+        </div>
+    </div>
+
+    <script>
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        // ── STORAGE KEYS ────────────────────────────────────────────────────
+        const KEYS = {
+            categories: 'labtimer_categories',
+            buttons:    'labtimer_buttons'
+        };
+
+        // ── DEFAULTS ─────────────────────────────────────────────────────────
+        const DEFAULT_CATEGORIES = [
+            { name: "Reaction A", color: "#10b981" },
+            { name: "Reaction B", color: "#3b82f6" },
+            { name: "Reaction C", color: "#f59e0b" }
+        ];
+        const DEFAULT_BUTTONS = [
+            { id: 1, min: 10, sec: 0 },
+            { id: 2, min: 5,  sec: 0 }
+        ];
+
+        // ── LOAD FROM LOCALSTORAGE (o defaults) ─────────────────────────────
+        function loadCategories() {
+            try {
+                const stored = localStorage.getItem(KEYS.categories);
+                return stored ? JSON.parse(stored) : JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+            } catch { return JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)); }
+        }
+
+        function loadButtons() {
+            try {
+                const stored = localStorage.getItem(KEYS.buttons);
+                return stored ? JSON.parse(stored) : JSON.parse(JSON.stringify(DEFAULT_BUTTONS));
+            } catch { return JSON.parse(JSON.stringify(DEFAULT_BUTTONS)); }
+        }
+
+        // ── SAVE TO LOCALSTORAGE ─────────────────────────────────────────────
+        function saveCategories() {
+            localStorage.setItem(KEYS.categories, JSON.stringify(categories));
+            showToast("✓ Categorías guardadas");
+        }
+
+        function saveButtons() {
+            localStorage.setItem(KEYS.buttons, JSON.stringify(customButtons));
+        }
+
+        function resetConfig() {
+            if (!confirm("¿Restablecer categorías y botones a los valores por defecto?")) return;
+            localStorage.removeItem(KEYS.categories);
+            localStorage.removeItem(KEYS.buttons);
+            categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+            customButtons = JSON.parse(JSON.stringify(DEFAULT_BUTTONS));
+            renderCatConfig();
+            initCategories();
+            showToast("↺ Configuración restablecida");
+        }
+
+        // ── TOAST ─────────────────────────────────────────────────────────────
+        function showToast(msg = "✓ Guardado") {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 2000);
+        }
+
+        // ── ESTADO ───────────────────────────────────────────────────────────
+        let categories    = loadCategories();
+        let customButtons = loadButtons();
+        let timerIntervals = [];
+        let categoryCounters = {};
+
+        // ── CLICK GLOBAL (sonido UI) ─────────────────────────────────────────
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('button') || e.target.closest('.color-picker-input')) {
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.05);
+                gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.05);
+            }
+        });
+
+        // ── CRONÓMETRO ───────────────────────────────────────────────────────
+        let swInterval, swStartTime = 0, swElapsedTime = 0, swIsRunning = false;
+
+        function updateStopwatch() {
+            const t = Date.now() - swStartTime + swElapsedTime;
+            const ms = Math.floor((t % 1000) / 100);
+            const s  = Math.floor((t / 1000) % 60).toString().padStart(2, '0');
+            const m  = Math.floor((t / 60000) % 60).toString().padStart(2, '0');
+            const h  = Math.floor(t / 3600000).toString().padStart(2, '0');
+            document.getElementById('sw-time').innerText = `${h}:${m}:${s}.${ms}`;
+        }
+
+        function toggleStopwatch() {
+            if (swIsRunning) {
+                clearInterval(swInterval); swElapsedTime += Date.now() - swStartTime;
+                swIsRunning = false; document.getElementById('sw-play').innerText = '▶';
+            } else {
+                swStartTime = Date.now(); swInterval = setInterval(updateStopwatch, 100);
+                swIsRunning = true; document.getElementById('sw-play').innerText = '⏸';
+            }
+        }
+
+        function resetStopwatch() {
+            clearInterval(swInterval); swIsRunning = false; swElapsedTime = 0;
+            document.getElementById('sw-time').innerText = '00:00:00.0';
+            document.getElementById('sw-play').innerText = '▶';
+        }
+
+        // ── CATEGORÍAS ───────────────────────────────────────────────────────
+        function initCategories() {
+            const select = document.getElementById('categorySelect');
+            const currentVal = select.value;
+            select.innerHTML = categories.map(c =>
+                `<option value="${c.name}">${c.name}</option>`
+            ).join('');
+            if (categories.some(c => c.name === currentVal)) select.value = currentVal;
+            renderQuickButtons();
+            saveCategories();
+        }
+
+        function renderCatConfig() {
+            const container = document.getElementById('catListConfig');
+            container.innerHTML = categories.map((cat, i) => `
+                <div class="cat-item-row">
+                    <input type="color" class="color-picker-input" value="${cat.color}"
+                        onchange="updateCatColor(${i}, this.value)">
+                    <input class="cat-input" value="${cat.name}"
+                        onchange="updateCatName(${i}, this.value)">
+                    <button class="btn-delete-quick"
+                        style="position:static; width:28px; height:28px;"
+                        onclick="removeCategory(${i})">✕</button>
+                </div>
+            `).join('');
+        }
+
+        function updateCatColor(idx, val) { categories[idx].color = val; initCategories(); }
+        function updateCatName(idx, val)  { categories[idx].name  = val || "???"; initCategories(); }
+        function removeCategory(idx) {
+            if (categories.length > 1) {
+                categories.splice(idx, 1);
+                renderCatConfig();
+                initCategories();
+            }
+        }
+        function addNewCategory() {
+            categories.push({ name: "Nueva", color: "#ffffff" });
+            renderCatConfig();
+            initCategories();
+        }
+
+        // ── PICKERS ──────────────────────────────────────────────────────────
+        function initPickers() {
+            const setup = (id, max) => {
+                let h = '';
+                for (let i = 0; i <= max; i++)
+                    h += `<div class="picker-item">${i.toString().padStart(2, '0')}</div>`;
+                document.getElementById(id).innerHTML = h;
+            };
+            setup('minWheel', 60); setup('secWheel', 59);
+        }
+
+        function stepPicker(id, dir) {
+            const el = document.getElementById(id);
+            const itemH = 44;
+            const cur = Math.round(el.scrollTop / itemH);
+            el.scrollTo({ top: (cur + dir) * itemH, behavior: 'smooth' });
+        }
+
+        // ── BOTONES RÁPIDOS ───────────────────────────────────────────────────
+        function renderQuickButtons() {
+            const container = document.getElementById('quickButtonsContainer');
+            const catName = document.getElementById('categorySelect').value;
+            const cat = categories.find(c => c.name === catName) || categories[0];
+
+            container.innerHTML = customButtons.map(btn => `
+                <button class="btn-quick"
+                    style="border-color:${cat.color}; color:${cat.color}"
+                    onclick="addTimer(${btn.min * 60 + btn.sec})">
+                    ${btn.min > 0 ? btn.min + 'm' : btn.sec + 's'}
+                    <span>${cat.name}</span>
+                    <div class="btn-delete-quick"
+                        onclick="deleteQuickButton(event, ${btn.id})">✕</div>
+                </button>
+            `).join('') +
+            `<button class="btn-quick"
+                style="border:1px dashed #666; color:#666"
+                onclick="openModal('addBtnModal')">+</button>`;
+        }
+
+        function saveNewButton() {
+            const min = Math.round(document.getElementById('minWheel').scrollTop / 44);
+            const sec = Math.round(document.getElementById('secWheel').scrollTop / 44);
+            if (min + sec === 0) return;
+            customButtons.push({ id: Date.now(), min, sec });
+            saveButtons();
+            closeModal('addBtnModal');
+            renderQuickButtons();
+        }
+
+        function deleteQuickButton(e, id) {
+            e.stopPropagation();
+            customButtons = customButtons.filter(b => b.id !== id);
+            saveButtons();
+            renderQuickButtons();
+        }
+
+        // ── TEMPORIZADORES ────────────────────────────────────────────────────
+        function updateActiveCount() {
+            document.getElementById('activeCountBadge').innerText = timerIntervals.length;
+        }
+
+        function addTimer(total) {
+            const catName = document.getElementById('categorySelect').value;
+            const cat = categories.find(c => c.name === catName);
+            if (!categoryCounters[catName]) categoryCounters[catName] = 1;
+            const count = categoryCounters[catName]++;
+            const id = Date.now();
+
+            const card = document.createElement('div');
+            card.className = 'timer-card';
+            card.id = `timer-${id}`;
+            card.style.borderColor = cat.color;
+            card.innerHTML = `
+                <span class="timer-id-badge">#${count}</span>
+                <button class="timer-delete" onclick="removeTimer(${id})">✕</button>
+                <div class="timer-time" id="val-${id}">${formatTime(total)}</div>
+                <div class="timer-cat-label">${cat.name}</div>
+            `;
+            document.getElementById('timers-container').appendChild(card);
+
+            let rem = total;
+            const interval = setInterval(() => {
+                rem--;
+                const el = document.getElementById(`val-${id}`);
+                if (!el) return clearInterval(interval);
+                el.innerText = (rem < 0 ? "+" : "") + formatTime(Math.abs(rem));
+                if (rem === 0) {
+                    playAlarm();
+                    card.classList.add('timer-expired');
+                }
+            }, 1000);
+
+            timerIntervals.push({ id, interval });
+            updateActiveCount();
+        }
+
+        function formatTime(s) {
+            const mins = Math.floor(s / 60).toString().padStart(2, '0');
+            const secs = (s % 60).toString().padStart(2, '0');
+            return `${mins}:${secs}`;
+        }
+
+        function removeTimer(id) {
+            const idx = timerIntervals.findIndex(t => t.id === id);
+            if (idx > -1) {
+                clearInterval(timerIntervals[idx].interval);
+                timerIntervals.splice(idx, 1);
+            }
+            document.getElementById(`timer-${id}`)?.remove();
+            updateActiveCount();
+        }
+
+        function clearAll() {
+            timerIntervals.forEach(t => clearInterval(t.interval));
+            timerIntervals = [];
+            document.getElementById('timers-container').innerHTML = '';
+            categoryCounters = {};
+            updateActiveCount();
+        }
+
+        // ── ALARMA ────────────────────────────────────────────────────────────
+        function playAlarm() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const now = audioCtx.currentTime;
+            for (let i = 0; i < 6; i++) {
+                const t = now + (i * 0.5);
+                playChime(t);
+                playChime(t + 0.15);
+            }
+        }
+
+        function playChime(time) {
+            const osc  = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(880, time);
+            gain.gain.setValueAtTime(0, time);
+            gain.gain.linearRampToValueAtTime(0.8, time + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.01, time + 0.3);
+            osc.start(time); osc.stop(time + 0.35);
+        }
+
+        // ── MODALES ───────────────────────────────────────────────────────────
+        function openModal(id) {
+            document.getElementById(id).style.display = 'flex';
+            if (id === 'catModal') renderCatConfig();
+            if (id === 'addBtnModal') {
+                setTimeout(() => {
+                    document.getElementById('minWheel').scrollTop = 44;
+                    document.getElementById('secWheel').scrollTop = 0;
+                }, 50);
+            }
+        }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+        // ── INIT ─────────────────────────────────────────────────────────────
+        initPickers();
+        initCategories();
+    </script>
+</body>
+</html>
